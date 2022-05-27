@@ -26,6 +26,8 @@ func main() {
 		handler = authHandler(handler, user, pass)
 	}
 
+	log.Print("starting webdave server on :5000")
+
 	if err := http.ListenAndServe(":5000", handler); err != http.ErrServerClosed {
 		log.Println(err)
 	}
@@ -43,11 +45,13 @@ func authHandler(handler http.Handler, user, pass string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		u, p, ok := r.BasicAuth()
 		if !ok {
+			log.Printf("webdave: authentication failed, missing basic authentication")
 			w.Header().Set("WWW-Authenticate", "Basic realm=\"WebDAV\", charset=\"UTF-8\"")
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
 		if u != user || p != pass {
+			log.Printf("webdave: authentication failed, invalid username or password")
 			w.WriteHeader(http.StatusForbidden)
 			return
 		}
