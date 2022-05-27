@@ -20,6 +20,10 @@ func main() {
 		Prefix:     prefix,
 		FileSystem: webdav.Dir(root),
 		LockSystem: webdav.NewMemLS(),
+		Logger: func(r *http.Request, err error) {
+			log.Printf("webdave: %v %v (%v) (%#v): %v",
+				r.Method, r.URL.Path, r.ContentLength, r.Header, err)
+		},
 	}
 
 	if user != "" && pass != "" {
@@ -51,10 +55,12 @@ func authHandler(handler http.Handler, user, pass string) http.Handler {
 			return
 		}
 		if u != user || p != pass {
-			log.Printf("webdave: authentication failed, invalid username or password")
+			log.Print("webdave: authentication failed, invalid username or password")
 			w.WriteHeader(http.StatusForbidden)
 			return
 		}
+
+		log.Print("webdave: authentication succeeded")
 
 		handler.ServeHTTP(w, r)
 	})
