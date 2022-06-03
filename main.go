@@ -4,6 +4,8 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
+	"syscall"
 
 	"golang.org/x/net/webdav"
 )
@@ -14,7 +16,29 @@ func main() {
 		prefix = lookupWithDefault("PREFIX", "")
 		user   = lookupWithDefault("USERNAME", "")
 		pass   = lookupWithDefault("PASSWORD", "")
+		puid   = lookupWithDefault("PUID", "")
+		pgid   = lookupWithDefault("PGID", "")
 	)
+
+	if puid != "" && puid != "0" {
+		id, err := strconv.Atoi(puid)
+		if err != nil {
+			log.Fatalf("Invalid PUID: %v", err)
+		}
+		if err = syscall.Setuid(id); err != nil {
+			log.Fatalf("Failed to setuid to %v: %v", id, err)
+		}
+	}
+
+	if pgid != "" && pgid != "0" {
+		id, err := strconv.Atoi(pgid)
+		if err != nil {
+			log.Fatalf("Invalid PGID: %v", err)
+		}
+		if err = syscall.Setgid(id); err != nil {
+			log.Fatalf("Failed to setgid to %v: %v", id, err)
+		}
+	}
 
 	var handler http.Handler = &webdav.Handler{
 		Prefix:     prefix,

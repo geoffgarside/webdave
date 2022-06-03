@@ -15,5 +15,5 @@ COPY --from=builder /etc/passwd /etc/passwd
 COPY --from=builder /etc/group /etc/group
 COPY --from=builder /webdave /webdave
 EXPOSE 5000
-USER app
+ENV PUID=1000 PGID=1000
 ENTRYPOINT ["/webdave"]
