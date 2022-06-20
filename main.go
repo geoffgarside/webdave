@@ -22,7 +22,7 @@ func main() {
 
 	if puid != "" && puid != "0" {
 		if err := setUID(puid); err != nil {
-			log.Fatalf("Failed to setgid to %v: %v", puid, err)
+			log.Fatalf("Failed to setuid to %v: %v", puid, err)
 		} else {
 			log.Printf("UID set to %v", puid)
 		}
