@@ -21,22 +21,18 @@ func main() {
 	)
 
 	if puid != "" && puid != "0" {
-		id, err := strconv.Atoi(puid)
-		if err != nil {
-			log.Fatalf("Invalid PUID: %v", err)
-		}
-		if err = syscall.Setuid(id); err != nil {
-			log.Fatalf("Failed to setuid to %v: %v", id, err)
+		if err := setUID(puid); err != nil {
+			log.Fatalf("Failed to setgid to %v: %v", puid, err)
+		} else {
+			log.Printf("UID set to %v", puid)
 		}
 	}
 
 	if pgid != "" && pgid != "0" {
-		id, err := strconv.Atoi(pgid)
-		if err != nil {
-			log.Fatalf("Invalid PGID: %v", err)
-		}
-		if err = syscall.Setgid(id); err != nil {
-			log.Fatalf("Failed to setgid to %v: %v", id, err)
+		if err := setGID(pgid); err != nil {
+			log.Fatalf("Failed to setgid to %v: %v", pgid, err)
+		} else {
+			log.Printf("GID set to %v", pgid)
 		}
 	}
 
@@ -54,7 +50,8 @@ func main() {
 		handler = authHandler(handler, user, pass)
 	}
 
-	log.Print("starting webdave server on :5000")
+	log.Printf("starting webdave server on :5000 [uid=%v/gid=%v]",
+		syscall.Getuid(), syscall.Getgid())
 
 	if err := http.ListenAndServe(":5000", handler); err != http.ErrServerClosed {
 		log.Println(err)
@@ -88,4 +85,28 @@ func authHandler(handler http.Handler, user, pass string) http.Handler {
 
 		handler.ServeHTTP(w, r)
 	})
+}
+
+func setUID(uid string) error {
+	id, err := strconv.Atoi(uid)
+	if err != nil {
+		return err
+	}
+	if err = syscall.Setuid(id); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func setGID(gid string) error {
+	id, err := strconv.Atoi(gid)
+	if err != nil {
+		return err
+	}
+	if err = syscall.Setgid(id); err != nil {
+		return err
+	}
+
+	return nil
 }
