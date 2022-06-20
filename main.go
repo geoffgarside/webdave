@@ -1,9 +1,11 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
+	"sync"
 	"syscall"
 
 	"golang.org/x/net/webdav"
@@ -19,7 +21,7 @@ func main() {
 
 	var handler http.Handler = &webdav.Handler{
 		Prefix:     prefix,
-		FileSystem: webdav.Dir(root),
+		FileSystem: statCacheFS(webdav.Dir(root)),
 		LockSystem: webdav.NewMemLS(),
 		Logger: func(r *http.Request, err error) {
 			log.Printf("webdave: %v %v (%v) (%#v): %v",
@@ -66,4 +68,52 @@ func authHandler(handler http.Handler, user, pass string) http.Handler {
 
 		handler.ServeHTTP(w, r)
 	})
+}
+
+func statCacheFS(fs webdav.FileSystem) *statCachingFileSystem {
+	return &statCachingFileSystem{
+		FileSystem: fs,
+		cache:      make(map[string]os.FileInfo),
+	}
+}
+
+type statCachingFileSystem struct {
+	webdav.FileSystem
+
+	mu    sync.Mutex
+	cache map[string]os.FileInfo
+}
+
+func (fs *statCachingFileSystem) RemoveAll(ctx context.Context, name string) error {
+	fs.mu.Lock()
+	delete(fs.cache, name)
+	fs.mu.Unlock()
+
+	return fs.FileSystem.RemoveAll(ctx, name)
+}
+func (fs *statCachingFileSystem) Rename(ctx context.Context, oldName string, newName string) error {
+	fs.mu.Lock()
+	delete(fs.cache, oldName)
+	fs.mu.Unlock()
+
+	return fs.FileSystem.Rename(ctx, oldName, newName)
+}
+func (fs *statCachingFileSystem) Stat(ctx context.Context, name string) (os.FileInfo, error) {
+	fs.mu.Lock()
+	fi, ok := fs.cache[name]
+	fs.mu.Unlock()
+	if ok {
+		return fi, nil
+	}
+
+	fi, err := fs.FileSystem.Stat(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+
+	fs.mu.Lock()
+	fs.cache[name] = fi
+	fs.mu.Unlock()
+
+	return fi, nil
 }
