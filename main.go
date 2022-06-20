@@ -1,11 +1,9 @@
 package main
 
 import (
-	"context"
 	"log"
 	"net/http"
 	"os"
-	"strconv"
 	"syscall"
 
 	"golang.org/x/net/webdav"
@@ -17,29 +15,11 @@ func main() {
 		prefix = lookupWithDefault("PREFIX", "")
 		user   = lookupWithDefault("USERNAME", "")
 		pass   = lookupWithDefault("PASSWORD", "")
-		puid   = lookupWithDefault("PUID", "")
-		pgid   = lookupWithDefault("PGID", "")
 	)
-
-	if puid != "" && puid != "0" {
-		if err := setUID(puid); err != nil {
-			log.Fatalf("Failed to setuid to %v: %v", puid, err)
-		} else {
-			log.Printf("UID set to %v", puid)
-		}
-	}
-
-	if pgid != "" && pgid != "0" {
-		if err := setGID(pgid); err != nil {
-			log.Fatalf("Failed to setgid to %v: %v", pgid, err)
-		} else {
-			log.Printf("GID set to %v", pgid)
-		}
-	}
 
 	var handler http.Handler = &webdav.Handler{
 		Prefix:     prefix,
-		FileSystem: loggingFileSystem{webdav.Dir(root)},
+		FileSystem: webdav.Dir(root),
 		LockSystem: webdav.NewMemLS(),
 		Logger: func(r *http.Request, err error) {
 			log.Printf("webdave: %v %v (%v) (%#v): %v",
@@ -86,64 +66,4 @@ func authHandler(handler http.Handler, user, pass string) http.Handler {
 
 		handler.ServeHTTP(w, r)
 	})
-}
-
-func setUID(uid string) error {
-	id, err := strconv.Atoi(uid)
-	if err != nil {
-		return err
-	}
-	if err = syscall.Setuid(id); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func setGID(gid string) error {
-	id, err := strconv.Atoi(gid)
-	if err != nil {
-		return err
-	}
-	if err = syscall.Setgid(id); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-var _ webdav.FileSystem = loggingFileSystem{}
-
-type loggingFileSystem struct {
-	fs webdav.FileSystem
-}
-
-func (l loggingFileSystem) Mkdir(ctx context.Context, name string, perm os.FileMode) error {
-	err := l.fs.Mkdir(ctx, name, perm)
-	log.Printf("webdave: mkdir [name=%v perm=%v err=%v]", name, perm, err)
-	return err
-}
-
-func (l loggingFileSystem) OpenFile(ctx context.Context, name string, flag int, perm os.FileMode) (webdav.File, error) {
-	f, err := l.fs.OpenFile(ctx, name, flag, perm)
-	log.Printf("webdave: open file [name=%v flag=%v perm=%v file=%v err=%v]", name, flag, perm, f, err)
-	return f, err
-}
-
-func (l loggingFileSystem) RemoveAll(ctx context.Context, name string) error {
-	err := l.fs.RemoveAll(ctx, name)
-	log.Printf("webdave: remove all [name=%v err=%v]", name, err)
-	return err
-}
-
-func (l loggingFileSystem) Rename(ctx context.Context, oldName, newName string) error {
-	err := l.fs.Rename(ctx, oldName, newName)
-	log.Printf("webdave: rename [oldName=%v newName=%v err=%v]", oldName, newName, err)
-	return err
-}
-
-func (l loggingFileSystem) Stat(ctx context.Context, name string) (os.FileInfo, error) {
-	fi, err := l.fs.Stat(ctx, name)
-	log.Printf("webdave: stat [name=%v fileInfo=%v err=%v]", name, fi, err)
-	return fi, err
 }
