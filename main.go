@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
@@ -38,7 +39,7 @@ func main() {
 
 	var handler http.Handler = &webdav.Handler{
 		Prefix:     prefix,
-		FileSystem: webdav.Dir(root),
+		FileSystem: loggingFileSystem{webdav.Dir(root)},
 		LockSystem: webdav.NewMemLS(),
 		Logger: func(r *http.Request, err error) {
 			log.Printf("webdave: %v %v (%v) (%#v): %v",
@@ -109,4 +110,40 @@ func setGID(gid string) error {
 	}
 
 	return nil
+}
+
+var _ webdav.FileSystem = loggingFileSystem{}
+
+type loggingFileSystem struct {
+	fs webdav.FileSystem
+}
+
+func (l loggingFileSystem) Mkdir(ctx context.Context, name string, perm os.FileMode) error {
+	err := l.fs.Mkdir(ctx, name, perm)
+	log.Printf("webdave: mkdir [name=%v perm=%v err=%v]", name, perm, err)
+	return err
+}
+
+func (l loggingFileSystem) OpenFile(ctx context.Context, name string, flag int, perm os.FileMode) (webdav.File, error) {
+	f, err := l.fs.OpenFile(ctx, name, flag, perm)
+	log.Printf("webdave: open file [name=%v flag=%v perm=%v file=%v err=%v]", name, flag, perm, f, err)
+	return f, err
+}
+
+func (l loggingFileSystem) RemoveAll(ctx context.Context, name string) error {
+	err := l.fs.RemoveAll(ctx, name)
+	log.Printf("webdave: remove all [name=%v err=%v]", name, err)
+	return err
+}
+
+func (l loggingFileSystem) Rename(ctx context.Context, oldName, newName string) error {
+	err := l.fs.Rename(ctx, oldName, newName)
+	log.Printf("webdave: rename [oldName=%v newName=%v err=%v]", oldName, newName, err)
+	return err
+}
+
+func (l loggingFileSystem) Stat(ctx context.Context, name string) (os.FileInfo, error) {
+	fi, err := l.fs.Stat(ctx, name)
+	log.Printf("webdave: stat [name=%v fileInfo=%v err=%v]", name, fi, err)
+	return fi, err
 }
